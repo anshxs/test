@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import { Difficulty } from '@prisma/client';
 import { fetchLatestSubmissionsCodeForces, fetchLatestSubmissionsLeetCode } from '@/serverActions/fetch';
 import axios from 'axios';
+import CodeforcesApiBanner from './CodeforcesApiBanner';
 import {
   Select,
   SelectContent,
@@ -90,13 +91,15 @@ const QuestionSolving = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>("ALL");
   const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([]);
+  const [codeforcesApiCredentials, setCodeforcesApiCredentials] = useState<{apiKey: string | null, apiSecret: string | null}>({ apiKey: null, apiSecret: null });
+  const [showApiBanner, setShowApiBanner] = useState<boolean>(false);
   let newString = Array.isArray(array) ? array.join('/') : null;
   newString = "/" + newString
   const newArray = newString ? newString.split('/s/') : null;
   const topics = newArray ? newArray[1].split('/') : null;
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const difficulties = newArray ? newArray[2].split('/') : null;
-  const [isVerifying, setIsVerifying] = useState<{ [key: string]: boolean }>({}); 
+  const [isVerifying, setIsVerifying] = useState<{ [key: string]: boolean }>({});
   const fn = async () => {
     const res = await axios.get('/api/getTags')
     //@ts-expect-error: not needed here.
@@ -106,6 +109,30 @@ const QuestionSolving = () => {
 
   useEffect(() => {
     fn()
+  }, []);
+
+  // Fetch Codeforces API credentials
+  useEffect(() => {
+    const fetchApiCredentials = async () => {
+      try {
+        const apiResponse = await axios.get('/api/user/codeforces-api');
+        if (apiResponse.data.hasApiKey) {
+          setCodeforcesApiCredentials({
+            apiKey: apiResponse.data.apiKey,
+            apiSecret: apiResponse.data.apiSecret,
+          });
+          setShowApiBanner(false);
+        } else {
+          setShowApiBanner(true);
+        }
+      } catch (error) {
+        console.error('Error fetching API credentials:', error);
+        // Continue without user's API credentials - will use default
+        setShowApiBanner(true);
+      }
+    };
+
+    fetchApiCredentials();
   }, []);
 
 
@@ -125,7 +152,8 @@ const QuestionSolving = () => {
             p.statusDisplay === 'Accepted'
         ) || false;
       } else {
-        const res = await fetchLatestSubmissionsCodeForces(username);
+        // Use user's API credentials if available
+        const res = await fetchLatestSubmissionsCodeForces(username, codeforcesApiCredentials);
         return res?.some(
           (p: CodeForcesSubmission) => 
             p.problem.name === problemName && 
@@ -328,7 +356,15 @@ const QuestionSolving = () => {
   return (
   <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'} transition-colors duration-300`}>
     <div className={`container mx-auto p-4 max-w-6xl ${isDarkMode ? 'dark' : ''}`}>
-    <Card className={`mb-6 mt-16 ${isDarkMode ? 'bg-gray-800/90 border-gray-700' : 'bg-indigo-50/90 border-indigo-100'} shadow-sm`}>
+    
+    {/* Show API Key Banner if not configured */}
+    {showApiBanner && (
+      <div className="mt-16 mb-4">
+        <CodeforcesApiBanner onClose={() => setShowApiBanner(false)} />
+      </div>
+    )}
+    
+    <Card className={`mb-6 ${showApiBanner ? '' : 'mt-16'} ${isDarkMode ? 'bg-gray-800/90 border-gray-700' : 'bg-indigo-50/90 border-indigo-100'} shadow-sm`}>
       <CardContent className="py-6">
         <div className="flex justify-between items-center mb-6">
           <div>

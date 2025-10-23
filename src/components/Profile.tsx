@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import Leetcode from '@/images/leetcode-svgrepo-com.svg'
 import Codeforces from '@/images/codeforces-svgrepo-com.svg'
 import {
@@ -14,10 +16,17 @@ import {
   Calendar,
   CheckCircle,
   XCircle,
-  Medal
+  Medal,
+  Key,
+  Eye,
+  EyeOff,
+  Save,
+  Loader2
 } from 'lucide-react';
 import { ContestStatus, SubmissionStatus, Difficulty } from '@prisma/client';
 import Image from 'next/image';
+import { useSession } from 'next-auth/react';
+import { toast } from '@/hooks/use-toast';
 
 // Type definitions
 type QuestionTag = {
@@ -137,9 +146,22 @@ const formatDate = (date: Date): string => {
 
 const Profile = ({ isDarkMode = false }) => {
   const params = useParams();
+  const { data: session } = useSession();
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // API Key states
+  const [apiKey, setApiKey] = useState<string>('');
+  const [apiSecret, setApiSecret] = useState<string>('');
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [showApiSecret, setShowApiSecret] = useState<boolean>(false);
+  const [isEditingApi, setIsEditingApi] = useState<boolean>(false);
+  const [isSavingApi, setIsSavingApi] = useState<boolean>(false);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  
+  // Check if the profile being viewed is the current user's
+  const isOwnProfile = session?.user?.email === profileData?.user?.email;
 
  const getStatusColor = (status: SubmissionStatus) => {
     const colors = {
@@ -192,6 +214,91 @@ const Profile = ({ isDarkMode = false }) => {
       fetchProfile();
     }
   }, [params.username]);
+
+  // Fetch API key status if viewing own profile
+  useEffect(() => {
+    const fetchApiKeyStatus = async () => {
+      if (isOwnProfile) {
+        try {
+          const response = await axios.get('/api/user/codeforces-api');
+          if (response.data.hasApiKey) {
+            setHasApiKey(true);
+            setApiKey(response.data.apiKey || '');
+            setApiSecret(response.data.apiSecret || '');
+          }
+        } catch (error) {
+          console.error('Error fetching API key status:', error);
+        }
+      }
+    };
+
+    fetchApiKeyStatus();
+  }, [isOwnProfile]);
+
+  const handleSaveApiKey = async () => {
+    if (!apiKey.trim() || !apiSecret.trim()) {
+      toast({
+        title: "Error",
+        description: "Both API key and secret are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingApi(true);
+    try {
+      const response = await axios.post('/api/user/codeforces-api', {
+        apiKey: apiKey.trim(),
+        apiSecret: apiSecret.trim(),
+      });
+
+      if (response.data.hasApiKey) {
+        setHasApiKey(true);
+        setIsEditingApi(false);
+        toast({
+          title: "Success",
+          description: "Codeforces API keys saved successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error saving API keys:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save API keys. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingApi(false);
+    }
+  };
+
+  const handleRemoveApiKey = async () => {
+    setIsSavingApi(true);
+    try {
+      await axios.post('/api/user/codeforces-api', {
+        apiKey: null,
+        apiSecret: null,
+      });
+
+      setHasApiKey(false);
+      setApiKey('');
+      setApiSecret('');
+      setIsEditingApi(false);
+      toast({
+        title: "Success",
+        description: "Codeforces API keys removed successfully",
+      });
+    } catch (error) {
+      console.error('Error removing API keys:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove API keys. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingApi(false);
+    }
+  };
 
   if (loading) return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   if (error || !profileData) return <div className="flex items-center justify-center min-h-screen">{error || 'Profile not found'}</div>;
@@ -304,6 +411,135 @@ const Profile = ({ isDarkMode = false }) => {
                 </div>
               </div>
             </div>
+
+            {/* Codeforces API Configuration Section - Only for own profile */}
+            {isOwnProfile && (
+              <div className={`border-t pt-4 ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className={`text-sm font-medium flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : ''}`}>
+                    <Key className="h-4 w-4" />
+                    Codeforces API Keys
+                  </h3>
+                  {hasApiKey && !isEditingApi && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingApi(true)}
+                      className={isDarkMode ? 'border-slate-600 text-slate-300' : ''}
+                    >
+                      Edit
+                    </Button>
+                  )}
+                </div>
+
+                {!hasApiKey || isEditingApi ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>API Key</label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          type={showApiKey ? 'text' : 'password'}
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder="Enter your API key"
+                          className={`flex-1 ${isDarkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className={isDarkMode ? 'border-slate-600' : ''}
+                        >
+                          {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>API Secret</label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          type={showApiSecret ? 'text' : 'password'}
+                          value={apiSecret}
+                          onChange={(e) => setApiSecret(e.target.value)}
+                          placeholder="Enter your API secret"
+                          className={`flex-1 ${isDarkMode ? 'bg-slate-700 border-slate-600 text-white' : ''}`}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setShowApiSecret(!showApiSecret)}
+                          className={isDarkMode ? 'border-slate-600' : ''}
+                        >
+                          {showApiSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className={`text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      Get your API keys from{' '}
+                      <Link href="https://codeforces.com/settings/api" target="_blank" className="text-blue-500 hover:underline">
+                        Codeforces API Settings
+                      </Link>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSaveApiKey}
+                        disabled={isSavingApi}
+                        className="flex-1"
+                      >
+                        {isSavingApi ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save
+                          </>
+                        )}
+                      </Button>
+                      {isEditingApi && (
+                        <>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsEditingApi(false);
+                              // Reset to original values if they exist
+                              if (!hasApiKey) {
+                                setApiKey('');
+                                setApiSecret('');
+                              }
+                            }}
+                            className={isDarkMode ? 'border-slate-600' : ''}
+                          >
+                            Cancel
+                          </Button>
+                          {hasApiKey && (
+                            <Button
+                              variant="destructive"
+                              onClick={handleRemoveApiKey}
+                              disabled={isSavingApi}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-green-900/20' : 'bg-green-50'}`}>
+                    <p className={`text-sm flex items-center gap-2 ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>
+                      <CheckCircle className="h-4 w-4" />
+                      API keys configured
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

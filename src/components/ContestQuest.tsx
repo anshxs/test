@@ -32,6 +32,7 @@ import toast from 'react-hot-toast';
 import { fetchLatestSubmissionsCodeForces, fetchLatestSubmissionsLeetCode } from '@/serverActions/fetch';
 import axios from 'axios';
 import CoordinatorContestPermissions from './CoordinatorContestPermissions';
+import CodeforcesApiBanner from './CodeforcesApiBanner';
 import Image from 'next/image';
 import { QuestionPar, useSocket } from '@/hooks/SocketContext';
 import useStore from '@/store/store';
@@ -72,6 +73,8 @@ const ContestQuest: React.FC = () => {
   const [isVerifying, setIsVerifying] = useState<Record<string, boolean>>({});
   const { isAdmin } = useStore()
   const { questions, setQuestions } = useSocket()
+  const [codeforcesApiCredentials, setCodeforcesApiCredentials] = useState<{apiKey: string | null, apiSecret: string | null}>({ apiKey: null, apiSecret: null });
+  const [showApiBanner, setShowApiBanner] = useState<boolean>(false);
 
   const animateScoreUpdate = (oldScore: number, newScore: number) => {
     setIsScoreUpdating(true);
@@ -135,7 +138,8 @@ const ContestQuest: React.FC = () => {
           }
         }
       } else {
-        const res = await fetchLatestSubmissionsCodeForces(cusername);
+        // Use user's API credentials if available
+        const res = await fetchLatestSubmissionsCodeForces(cusername, codeforcesApiCredentials);
         if (res) {
           let solved = res.find(
             (p: CodeForcesSubmission) => (p.problem.name === problemName && p.verdict === 'OK')
@@ -163,7 +167,7 @@ const ContestQuest: React.FC = () => {
     } finally {
       setIsVerifying({ ...isVerifying, [questionId]: false });
     }
-  }, [cusername, lusername, isVerifying, score, verifiedProblems]);
+  }, [cusername, lusername, isVerifying, score, verifiedProblems, codeforcesApiCredentials]);
 
   
 
@@ -210,6 +214,25 @@ const ContestQuest: React.FC = () => {
         const res = await axios.get('/api/user/username')
         setCUsername(res.data.codeforcesUsername)
         setLUsername(res.data.leetcodeUsername)
+        
+        // Fetch Codeforces API credentials
+        try {
+          const apiResponse = await axios.get('/api/user/codeforces-api');
+          if (apiResponse.data.hasApiKey) {
+            setCodeforcesApiCredentials({
+              apiKey: apiResponse.data.apiKey,
+              apiSecret: apiResponse.data.apiSecret,
+            });
+            setShowApiBanner(false);
+          } else {
+            setShowApiBanner(true);
+          }
+        } catch (apiError) {
+          console.error('Error fetching API credentials:', apiError);
+          // Continue without user's API credentials - will use default
+          setShowApiBanner(true);
+        }
+        
         const coordResponse = await axios.post('/api/checkIfCoordinator')
         if(!coordResponse.data.isCoordinator) setIsCoord(false);
         else {
@@ -429,6 +452,11 @@ const ContestQuest: React.FC = () => {
         </>
       ) : (
         <div className="container mx-auto p-4 pt-20 space-y-6">
+          {/* Show API Key Banner if not configured */}
+          {showApiBanner && (
+            <CodeforcesApiBanner onClose={() => setShowApiBanner(false)} />
+          )}
+          
           {/* Contest Status Bar */}
           <Card className="sticky top-16 z-10 bg-white border border-gray-100 shadow-sm">
             <CardContent className="py-6">

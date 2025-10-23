@@ -4,6 +4,10 @@ import { LeetCode } from "leetcode-query";
 import { CodeforcesAPI } from "codeforces-api-ts";
 import axios from "axios";
 
+interface CodeforcesCredentials {
+  apiKey?: string | null;
+  apiSecret?: string | null;
+}
 
 export async function fetchLatestSubmissionsLeetCode(username: string){
     await new Promise((resolve) => (setTimeout((resolve), 1500)))
@@ -21,9 +25,15 @@ export async function fetchLatestSubmissionsLeetCode(username: string){
 
 
 
-export async function fetchLatestSubmissionsCodeForces(username: string){
+export async function fetchLatestSubmissionsCodeForces(username: string, credentials?: CodeforcesCredentials){
     
-    if(process.env.CODEFORCES_API_KEY && process.env.CODEFORCES_SECRET){
+    // Use user's credentials if provided, otherwise fall back to default
+    if(credentials?.apiKey && credentials?.apiSecret){
+        CodeforcesAPI.setCredentials({
+            API_KEY: credentials.apiKey,
+            API_SECRET: credentials.apiSecret,
+          });
+    } else if(process.env.CODEFORCES_API_KEY && process.env.CODEFORCES_SECRET){
         CodeforcesAPI.setCredentials({
             API_KEY: process.env.CODEFORCES_API_KEY,
             API_SECRET: process.env.CODEFORCES_SECRET,
@@ -94,8 +104,14 @@ export async function fetchUserStats(username: string) {
 }
   
 
-export async function fetchCodeforcesUserData(username: string) {
-    if (process.env.CODEFORCES_API_KEY && process.env.CODEFORCES_SECRET) {
+export async function fetchCodeforcesUserData(username: string, credentials?: CodeforcesCredentials) {
+    // Use user's credentials if provided, otherwise fall back to default
+    if(credentials?.apiKey && credentials?.apiSecret){
+        CodeforcesAPI.setCredentials({
+            API_KEY: credentials.apiKey,
+            API_SECRET: credentials.apiSecret,
+        });
+    } else if (process.env.CODEFORCES_API_KEY && process.env.CODEFORCES_SECRET) {
         CodeforcesAPI.setCredentials({
             API_KEY: process.env.CODEFORCES_API_KEY,
             API_SECRET: process.env.CODEFORCES_SECRET,

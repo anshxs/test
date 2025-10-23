@@ -15,30 +15,32 @@ model UserApiKey {
 }
 
 model User {
-  id                  String           @id @default(uuid())
-  username            String           @unique
-  email               String           @unique
-  password            String
-  leetcodeUsername    String           @unique    
-  isComplete          Boolean     
-  codeforcesUsername  String           @unique        
-  section             String
-  enrollmentNum       String           @unique
-  profileUrl          String?
-  groupId             String?
-  group               Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  submissions         Submission[]
-  individualPoints    Int              @default(0)
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  applications        GroupApplication[] @relation("GroupApplications")
-  bookmarks           Bookmark[]
-  coordinatedGroup    Group?           @relation("GroupCoordinator") 
-  contestPermissions  ContestPermission[]
-  contestTime         TempContestTime[]
-  apiKey              UserApiKey?     
-  ratings             TagHintRating[]
-  config              UserConfig?
+  id                    String           @id @default(uuid())
+  username              String           @unique
+  email                 String           @unique
+  password              String
+  leetcodeUsername      String           @unique    
+  isComplete            Boolean     
+  codeforcesUsername    String           @unique        
+  section               String
+  enrollmentNum         String           @unique
+  profileUrl            String?
+  codeforcesApiKey      String?
+  codeforcesApiSecret   String?
+  groupId               String?
+  group                 Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  submissions           Submission[]
+  individualPoints      Int              @default(0)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  applications          GroupApplication[] @relation("GroupApplications")
+  bookmarks             Bookmark[]
+  coordinatedGroup      Group?           @relation("GroupCoordinator") 
+  contestPermissions    ContestPermission[]
+  contestTime           TempContestTime[]
+  apiKey                UserApiKey?     
+  ratings               TagHintRating[]
+  config                UserConfig?
   @@index([groupId]) 
 }
 
